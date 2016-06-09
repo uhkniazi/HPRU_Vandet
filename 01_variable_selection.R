@@ -13,6 +13,8 @@ source('CCrossValidation.R')
 # delete the file after source
 unlink('CCrossValidation.R')
 
+p.old = par()
+
 ### import the data
 dfData = read.csv('Data_external/data.csv', header=T, stringsAsFactors=F)
 dfData = na.omit(dfData)
@@ -46,28 +48,30 @@ mData = as.matrix(dfData)
 mData = t(mData)
 dfData = data.frame(mData)
 fGroups = dfAnno$fGroups
+table(fGroups)
 
 ################ variable selection steps
 set.seed(123)
 
 ## select test set
 test = sample(1:nrow(dfData), nrow(dfData) * 0.2, replace = F)
-
+table(fGroups[test]); table(fGroups[-test])
 ## random forest step
 oVar.r = CVariableSelection.RandomForest(dfData[-test,], groups = fGroups[-test], boot.num=100, big.warn = F)
 plot.var.selection(oVar.r)
 dfRF = CVariableSelection.RandomForest.getVariables(oVar.r)
-cvTopGenes = rownames(dfRF)[1:30]
+cvTopGenes = rownames(dfRF)[1:20]
 
 ## subset selection
 dfData = dfData[,colnames(dfData) %in% cvTopGenes]
 oVar.s = CVariableSelection.ReduceModel(dfData[-test,], fGroups[-test], boot.num=100)
 plot.var.selection(oVar.s)
-
+dfPrint = NULL
+par(mfrow=c(1,2))
 ## 10 fold cv
 ## 10 fold nested cross validation with various variable combinations
 # try models of various sizes with CV
-for (i in 1:8){
+for (i in 1:6){
   cvTopGenes.sub = CVariableSelection.ReduceModel.getMinModel(oVar.s, i)
   dfData.train = as.data.frame(dfData[-test, cvTopGenes.sub])
   colnames(dfData.train) = cvTopGenes.sub
@@ -75,15 +79,15 @@ for (i in 1:8){
   colnames(dfData.test) = cvTopGenes.sub
   
   oCV = CCrossValidation.LDA(test.dat = (dfData.test), train.dat = (dfData.train), test.groups = fGroups[test],
-                             train.groups = fGroups[-test], level.predict = 'D1.2', boot.num = 100)
+                             train.groups = fGroups[-test], level.predict = 'D1.2', boot.num = 500)
   
   plot.cv.performance(oCV)
   # print variable names and 95% confidence interval for AUC
-  temp = oCV@oAuc.cv
-  x = as.numeric(temp@y.values)
-  print(paste('Variable Count', i))
-  print(cvTopGenes.sub)
-  print(signif(quantile(x, probs = c(0.025, 0.975)), 2))
+  x = getAUCVector(oCV)
+  vc = (paste('Variable Count', i))
+  gn = paste(cvTopGenes.sub, collapse = ' ')
+  sig = (signif(quantile(x, probs = c(0.025, 0.975)), 2))
+  dfPrint = rbind(dfPrint, c(vc, gn, sig))
 }
 
-
+dfPrint
