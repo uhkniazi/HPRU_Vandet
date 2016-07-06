@@ -25,6 +25,11 @@ fGroups = factor(fGroups, levels = c('D4', 'D1.2'))
 table(fGroups)
 dfAnno$fGroups = fGroups
 
+## remove people with lymph node involvement
+i = dfAnno$Lymph.node.involvement == 'Yes'
+table(i)
+dfAnno = dfAnno[!i,]
+
 ## select matching samples between the two data frame
 f = colnames(dfData) %in% as.character(dfAnno$IDEA.ID)
 table(f)
@@ -55,7 +60,8 @@ table(p.anova.adj < 0.01)
 i = which(p.anova.adj < 0.1)
 cvTopProteins = names(i)
 dfData.sub = data.frame(t(na.omit(t(mData[,i]))))
-
+dim(dfData.sub)
+head(dfData.sub)
 
 ################ variable selection steps
 if(!require(downloader) || !require(methods)) stop('Library downloader and methods required')
@@ -79,7 +85,7 @@ table(fGroups[test]); table(fGroups[-test])
 oVar.r = CVariableSelection.RandomForest(dfData[-test,], groups = fGroups[-test], boot.num=100, big.warn = F)
 plot.var.selection(oVar.r)
 dfRF = CVariableSelection.RandomForest.getVariables(oVar.r)
-cvTopGenes = rownames(dfRF)[1:10]
+cvTopGenes = rownames(dfRF)[1:30]
 
 ## subset selection
 dfData = dfData[,colnames(dfData) %in% cvTopGenes]
