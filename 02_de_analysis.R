@@ -38,6 +38,16 @@ dfData = dfData[,f]
 i = match(colnames(dfData), as.character(dfAnno$IDEA.ID))
 dfAnno = dfAnno[i,]
 
+## create factors for ethnicity and age
+iAge = dfAnno$Age
+fEthnicity = gsub('(\\w+):.+', '\\1', dfAnno$Ehtnicity.code.1, perl = T)
+i = which(fEthnicity %in% c('Unable/unwilling to respond', 'Mixed'))
+fEthnicity[i] = 'Other'
+fEthnicity = factor(fEthnicity)
+summary(iAge)
+summary(fEthnicity)
+dfAnno$fEthnicity = fEthnicity
+
 ## format data for DE analysis
 mData = as.matrix(dfData)
 mData = t(mData)
@@ -58,6 +68,24 @@ table(p.anova.adj < 0.1)
 table(p.anova.adj < 0.01)
 
 i = which(p.anova.adj < 0.1)
+
+## fit second model with age and ethnicity
+mData = mData[,i]
+
+p.anova = apply(mData, 2, function(x){
+  fit = lm(x ~ fGroups + fEthnicity + iAge)
+  return(anova(fit)$Pr[1])
+})
+
+hist(p.anova)
+p.anova.adj = p.adjust(p.anova, method='BH')
+hist(p.anova.adj)
+
+table(p.anova.adj < 0.1)
+table(p.anova.adj < 0.01)
+
+i = which(p.anova.adj < 0.01)
+
 cvTopProteins = names(i)
 dfData.sub = data.frame(t(na.omit(t(mData[,i]))))
 dim(dfData.sub)
@@ -116,3 +144,7 @@ for (i in 1:6){
 }
 
 dfPrint
+
+######### save list of DE genes and p-values
+dfExport = data.frame(Proteins=names(p.anova), p.value=p.anova, p.adjusted=p.anova.adj)
+write.csv(dfExport, file='Temp/proteins.csv')
